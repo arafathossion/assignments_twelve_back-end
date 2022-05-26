@@ -26,6 +26,14 @@ async function run() {
             res.send(tools);
         })
        
+        app.post('/tools', async (req, res) => {
+            const addNewProduct = req.body;
+            //   console.log(review)
+            const result = await manufacturerTools.insertOne(addNewProduct);
+            res.send(result)
+        })
+
+
 
     } finally {
         //   await client.close();
