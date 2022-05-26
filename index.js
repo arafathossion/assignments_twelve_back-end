@@ -31,6 +31,13 @@ function verifyJWT(req, res, next) {
 
 
 
+
+
+
+
+
+
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.x8cmc.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 async function run() {
@@ -38,19 +45,149 @@ async function run() {
         await client.connect();
         const database = client.db("assignmentTwelve");
         const manufacturerTools = database.collection("manufacturerTools");
-     
+        const userCollection = database.collection("user");
+        const orderCollection = database.collection("order");
+        const reviewCollection = database.collection("reviews");
+        const paymentCollection = database.collection('payments');
+        const blogCollection = database.collection('blogs');
+        const profileCollection = database.collection('profile');
 
 
         app.get('/tools', async (req, res) => {
             const tools = await manufacturerTools.find().toArray()
             res.send(tools);
         })
-       
         app.post('/tools', async (req, res) => {
             const addNewProduct = req.body;
             //   console.log(review)
             const result = await manufacturerTools.insertOne(addNewProduct);
             res.send(result)
+        })
+        app.get('/user', verifyJWT, async (req, res) => {
+            const users = await userCollection.find().toArray()
+            res.send(users);
+        })
+        app.get('/blogs', async (req, res) => {
+            const blogs = await blogCollection.find().toArray()
+            res.send(blogs);
+        })
+        app.get('/orders', async (req, res) => {
+            const orders = await orderCollection.find().toArray()
+            res.send(orders);
+        })
+
+        app.get('/review', async (req, res) => {
+            const review = await reviewCollection.find().toArray();
+            res.send(review)
+        })
+
+
+        app.get('/profile/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email};
+            console.log(email, "query" , query)
+            const profile = await profileCollection.findOne(query);
+            res.send(profile)
+        })
+
+
+        app.get('/tools/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const tool = await manufacturerTools.findOne(query);
+            res.send(tool)
+        })
+        app.get('/blogs/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const tool = await blogCollection.findOne(query);
+            res.send(tool)
+        })
+
+
+        app.get('/payment/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const tool = await orderCollection.findOne(query);
+            res.send(tool)
+        })
+
+        app.get('/myorder', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+
+            //   console.log('auth Header',authorization);
+            const decodedEmail = req.decoded.email;
+            if (email === decodedEmail) {
+                const query = { email: email };
+                const myOrders = await orderCollection.find(query).toArray();
+                return res.send(myOrders);
+            } else {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+
+        })
+
+
+        app.patch('/myorder/:id', verifyJWT, async(req, res) =>{
+            const id  = req.params.id;
+            const payment = req.body;
+            const filter = {_id: ObjectId(id)};
+            const updatedDoc = {
+              $set: {
+                paid: true,
+                transactionId: payment.transactionId
+              }
+            }
+      
+            const result = await paymentCollection.insertOne(payment);
+            const updatedOrder = await orderCollection.updateOne(filter, updatedDoc);
+            res.send(updatedOrder);
+          })
+        app.put('/updateStatus/:id', verifyJWT, async(req, res) =>{
+            const id  = req.params.id;
+            const filter = {_id: ObjectId(id)};
+            const options = { upsert: true };
+            const updatedDoc = {
+              $set: {
+                pending: true,
+              }
+            }
+            const updatedOrderStatus = await orderCollection.updateOne(filter, updatedDoc, options);
+            res.send(updatedOrderStatus);
+          })
+
+
+
+
+
+
+
+
+
+        app.get('/admin/:email' , async(req,res) =>{
+            const email = req.params.email;
+            const user = await userCollection.findOne({email: email});
+            const isAdmin = user.role === 'admin';
+            res.send({admin: isAdmin});
+        })
+
+
+
+        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
+            const email = req.params.email;
+            const requester = req.decoded.email;
+            const requesterAccount = await userCollection.findOne({ email: requester });
+            if (requesterAccount.role === 'admin') {
+                const filter = { email: email };
+                const updateDoc = {
+                    $set: { role: 'admin' },
+                }
+                const result = await userCollection.updateOne(filter, updateDoc);
+                res.send(result)
+            } else {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+
         })
 
 
@@ -66,6 +203,28 @@ async function run() {
             const result = await userCollection.updateOne(filter, updateDoc, options);
             const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN, { expiresIn: '1d' });
             res.send({ result, token })
+        })
+
+
+        app.put('/update/:email', async (req, res) => {
+            const email = req.params.email;
+            const update = req.body;
+            const filter = { email: email };
+            console.log(email, update, "filter", filter)
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: update,
+            }
+            const result = await profileCollection.updateOne(filter, updateDoc, options);           
+            res.send(result)
+        })
+
+
+        app.post('/order', async (req, res) => {
+            const order = req.body;
+            console.log(order)
+            const result = await orderCollection.insertOne(order);
+            res.send(result);
         })
 
 
