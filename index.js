@@ -68,6 +68,13 @@ async function run() {
             res.send({ result, token })
         })
 
+        app.post('/profile', async (req, res) => {
+            const profile = req.body;
+            //   console.log(review)
+            const result = await profileCollection.insertOne(profile);
+            res.send(result)
+        })
+
 
         app.delete('/order/:id', async (req, res) => {
             const id = req.params.id;
